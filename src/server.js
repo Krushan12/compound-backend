@@ -28,7 +28,7 @@ const start = async () => {
     // Start automatic price refresh scheduler
     startPriceRefreshScheduler();
     
-    app.listen(env.PORT, () => {
+    app.listen(env.PORT, '0.0.0.0', () => {
       // eslint-disable-next-line no-console
       console.log(`Server running on port ${env.PORT}`);
     });

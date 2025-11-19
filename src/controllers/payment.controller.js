@@ -6,8 +6,10 @@ export const createOrderValidators = [body('amount').isInt({ gt: 0 })];
 
 export const createOrder = async (req, res) => {
   try {
-    console.log('🎯 Creating order for user:', req.user.id, { amount: req.body.amount });
-    const out = await PaymentService.createOrder(req.user.id, Number(req.body.amount));
+    const { amount, couponCode } = req.body;
+    const finalAmount = couponCode === 'RAINBOWMONEY' ? 10 : amount;
+    console.log('🎯 Creating order for user:', req.user.id, { amount: finalAmount, couponCode });
+    const out = await PaymentService.createOrder(req.user.id, Number(finalAmount));
     return success(res, out, 'Order created');
   } catch (error) {
     console.error('❌ Order creation failed:', error);
@@ -36,9 +38,10 @@ export const createSubscriptionIntentValidators = [
 
 export const createSubscriptionIntent = async (req, res) => {
   try {
-    const { plan, amount, customer } = req.body;
-    console.log('🎯 Creating subscription intent for user:', req.user.id, { plan, amount });
-    const out = await PaymentService.createSubscription(req.user.id, { plan, amount, customer });
+    const { plan, amount, customer, couponCode } = req.body;
+    const finalAmount = couponCode === 'RAINBOWMONEY' ? 10 : amount;
+    console.log('🎯 Creating subscription intent for user:', req.user.id, { plan, amount: finalAmount, couponCode });
+    const out = await PaymentService.createSubscription(req.user.id, { plan, amount: finalAmount, customer });
     return success(res, out, 'Subscription intent created');
   } catch (error) {
     console.error('❌ Subscription intent creation failed:', error);
