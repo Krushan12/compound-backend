@@ -9,6 +9,8 @@ import {
   verifySubscription,
   createSubscriptionIntentValidators,
   verifySubscriptionValidators,
+  verifyOrder,
+  verifyOrderValidators,
 } from '../controllers/payment.controller.js';
 
 const router = Router();
@@ -49,6 +51,40 @@ const router = Router();
  *         description: Server error
  */
 router.post('/create-order', auth, createOrderValidators, validate, createOrder);
+
+/**
+ * @swagger
+ * /payment/orders/verify:
+ *   post:
+ *     summary: Verify a one-time Razorpay order payment
+ *     tags: [Payments]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [razorpay_order_id, razorpay_payment_id, razorpay_signature, amount]
+ *             properties:
+ *               razorpay_order_id:
+ *                 type: string
+ *               razorpay_payment_id:
+ *                 type: string
+ *               razorpay_signature:
+ *                 type: string
+ *               amount:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Verification successful
+ *       401:
+ *         description: Unauthorized
+ *       400:
+ *         description: Invalid signature / payload
+ */
+router.post('/orders/verify', auth, verifyOrderValidators, validate, verifyOrder);
 
 /**
  * @swagger

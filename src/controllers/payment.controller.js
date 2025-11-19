@@ -74,10 +74,29 @@ export const verifySubscription = async (req, res) => {
   return success(res, out, 'Subscription verified');
 };
 
+export const verifyOrderValidators = [
+  body('razorpay_order_id').isString(),
+  body('razorpay_payment_id').isString(),
+  body('razorpay_signature').isString(),
+  body('amount').isFloat({ gt: 0 }),
+];
+
+export const verifyOrder = async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
+  const out = await PaymentService.verifyOrderPayment(req.user.id, {
+    orderId: razorpay_order_id,
+    paymentId: razorpay_payment_id,
+    signature: razorpay_signature,
+    amount,
+  });
+  return success(res, out, 'Order payment verified');
+};
+
 export default {
   createOrder,
   webhook,
   subscriptionStatus,
   createSubscriptionIntent,
   verifySubscription,
+  verifyOrder,
 };
