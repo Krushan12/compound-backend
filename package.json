@@ -16,7 +16,8 @@
     "prisma:migrate": "prisma migrate dev --schema src/models/schema.prisma",
     "prisma:deploy": "prisma migrate deploy --schema src/models/schema.prisma",
     "prisma:studio": "prisma studio --schema src/models/schema.prisma",
-    "script:reset-statuses": "node scripts/reset-stock-statuses.js"
+    "script:reset-statuses": "node scripts/reset-stock-statuses.js",
+    "script:import-stocks": "node scripts/import-stock-recommendations-from-csv.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.927.0",
@@ -37,7 +38,8 @@
     "razorpay": "^2.9.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "winston": "^3.14.2"
+    "winston": "^3.14.2",
+    "csv-parse": "^5.5.6"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
