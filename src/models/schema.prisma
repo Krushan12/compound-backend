@@ -99,10 +99,9 @@ model MobileOtp {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  mobile         String   @unique
-  verificationId String
-  referenceId    Int?
-  provider       String
-  expiresAt      DateTime?
+  mobile      String   @unique
+  code        String
+  provider    String
+  expiresAt   DateTime?
+  attempts    Int      @default(0)
 }
-

@@ -3,154 +3,109 @@ import axios from 'axios';
 import env from '../config/env.js';
 import prisma from '../config/db.js';
 
-// Send OTP using Cashfree Mobile 360 API
+// Generate a 6-digit OTP code
+const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+// Send OTP using MSG91 Flow API
 export const sendOtp = async (mobile) => {
   const normalizedMobile = String(mobile).replace(/\D/g, '').slice(-10);
 
-  const baseUrl = env.CASHFREE_BASE_URL || 'https://sandbox.cashfree.com/verification';
-  const clientId = env.CASHFREE_CLIENT_ID;
-  const clientSecret = env.CASHFREE_CLIENT_SECRET;
-  const apiVersion = env.CASHFREE_API_VERSION || '2024-12-01';
+  const baseUrl = env.MSG91_BASE_URL || 'https://control.msg91.com/api/v5';
+  const authKey = env.MSG91_AUTH_KEY;
+  const flowId = env.MSG91_OTP_FLOW_ID;
+  const senderId = env.MSG91_SENDER_ID;
 
-  if (!clientId || !clientSecret) {
-    throw new Error('Cashfree credentials are not configured');
+  if (!authKey || !flowId || !senderId) {
+    throw new Error('MSG91 OTP is not configured');
   }
 
-  try {
-    const url = `${baseUrl}/mobile360/otp/send`;
+  const otpCode = generateOtpCode();
 
-    // Generate our own verification_id so we can reuse it for verify
-    const verificationId = `login-${normalizedMobile}-${Date.now()}`;
+  try {
+    const url = `${baseUrl}/flow/`;
 
     const payload = {
-      verification_id: verificationId,
-      mobile_number: normalizedMobile,
-      name: 'Rainbow Money User',
-      user_consent: {
-        timestamp: new Date().toISOString(),
-        purpose: 'User consent to receive OTP for Rainbow Money login.',
-        obtained: true,
-        type: 'EXPLICIT',
-      },
-      notification_modes: ['SMS'],
+      flow_id: flowId,
+      sender: senderId,
+      recipients: [
+        {
+          mobiles: `91${normalizedMobile}`,
+          OTP: otpCode, // For templates that use {{OTP}}
+          VAR1: otpCode, // For templates that use {{VAR1}}
+          number: otpCode, // For templates created from DLT placeholder ##number##
+        },
+      ],
     };
 
     const response = await axios.post(url, payload, {
       headers: {
-        'x-client-id': clientId,
-        'x-client-secret': clientSecret,
-        'x-api-version': apiVersion,
+        authkey: authKey,
         'Content-Type': 'application/json',
       },
     });
 
     const data = response.data || {};
 
-    // Temporary debug log to inspect Cashfree verify OTP response shape
-    // Remove or downgrade to proper logger in production if too noisy
-    console.log('Cashfree verify OTP response:', JSON.stringify(data));
-
-    if (!data.verification_id) {
-      throw new Error('Cashfree send OTP did not return verification_id');
+    if (data.type !== 'success') {
+      throw new Error(data.message || 'MSG91 send OTP failed');
     }
 
+    // Store OTP locally for verification
     await prisma.mobileOtp.upsert({
       where: { mobile: normalizedMobile },
       update: {
-        verificationId: data.verification_id,
-        referenceId: data.reference_id ?? null,
-        provider: 'cashfree',
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes validity
+        code: otpCode,
+        provider: 'msg91',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        attempts: 0,
       },
       create: {
         mobile: normalizedMobile,
-        verificationId: data.verification_id,
-        referenceId: data.reference_id ?? null,
-        provider: 'cashfree',
+        code: otpCode,
+        provider: 'msg91',
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       },
     });
 
-    return { mobile: normalizedMobile, provider: 'cashfree' };
+    return { mobile: normalizedMobile, provider: 'msg91' };
   } catch (err) {
-    throw new Error(`Failed to send OTP via Cashfree: ${err?.response?.data?.message || err.message}`);
+    throw new Error(`Failed to send OTP via MSG91: ${err?.response?.data?.message || err.message}`);
   }
 };
 
-// Verify OTP using Cashfree Mobile 360 API and sign user in
+// Verify OTP locally and sign user in
 export const verifyOtp = async (mobile, code) => {
   const normalizedMobile = String(mobile).replace(/\D/g, '').slice(-10);
 
-  const baseUrl = env.CASHFREE_BASE_URL || 'https://sandbox.cashfree.com/verification';
-  const clientId = env.CASHFREE_CLIENT_ID;
-  const clientSecret = env.CASHFREE_CLIENT_SECRET;
-  const apiVersion = env.CASHFREE_API_VERSION || '2024-12-01';
-
-  if (!clientId || !clientSecret) {
-    throw new Error('Cashfree credentials are not configured');
-  }
-
-  // Fetch latest OTP request for this mobile
   const record = await prisma.mobileOtp.findUnique({ where: { mobile: normalizedMobile } });
-  if (!record || !record.verificationId) {
-    return null;
-  }
+  if (!record) return null;
 
-  // Optional: check expiry locally first
+  // Check expiry
   if (record.expiresAt && record.expiresAt < new Date()) {
     return null;
   }
 
-  try {
-    const url = `${baseUrl}/mobile360/otp/verify`;
+  const inputCode = String(code).trim();
 
-    const payload = {
-      verification_id: record.verificationId,
-      otp: String(code).trim(),
-    };
-
-    const response = await axios.post(url, payload, {
-      headers: {
-        'x-client-id': clientId,
-        'x-client-secret': clientSecret,
-        'x-api-version': apiVersion,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const data = response.data || {};
-
-    // Debug log: inspect verify OTP response from Cashfree when OTP appears "invalid"
-    console.log('Cashfree verify OTP response:', JSON.stringify(data));
-
-    if (data.status !== 'SUCCESS') {
-      return null;
-    }
-
-    // OTP verified, sign in or create user
-    let user = await prisma.user.findUnique({
+  if (record.code !== inputCode) {
+    // Increment attempts on wrong code
+    await prisma.mobileOtp.update({
       where: { mobile: normalizedMobile },
-      include: { subscription: true },
+      data: { attempts: record.attempts + 1 },
     });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: { mobile: normalizedMobile, kycStatus: 'NOT_STARTED' },
-        include: { subscription: true },
-      });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, mobile: user.mobile },
-      env.JWT_SECRET,
-      { expiresIn: '7d' },
-    );
-
-    return { user, token };
-  } catch (err) {
-    // If Cashfree verification fails, treat as invalid OTP
     return null;
   }
+
+  // Successful verification: clean up OTP record
+  try {
+    await prisma.mobileOtp.delete({ where: { mobile: normalizedMobile } });
+  } catch (_e) {
+    // ignore if already deleted
+  }
+
+  // Reuse existing signInWithMobile logic
+  const { user, token } = await signInWithMobile(normalizedMobile);
+  return { user, token };
 };
 
 export const emailSignin = async (userId, email) => {

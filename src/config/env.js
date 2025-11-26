@@ -10,13 +10,11 @@ export const env = {
   RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || '',
   RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || '',
   RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET || '',
-  // Cashfree Mobile 360 OTP
-  CASHFREE_BASE_URL: process.env.CASHFREE_BASE_URL || '',
-  CASHFREE_CLIENT_ID: process.env.CASHFREE_CLIENT_ID || '',
-  CASHFREE_CLIENT_SECRET: process.env.CASHFREE_CLIENT_SECRET || '',
-  CASHFREE_OTP_TEMPLATE_ID: process.env.CASHFREE_OTP_TEMPLATE_ID || '',
-  CASHFREE_SENDER_ID: process.env.CASHFREE_SENDER_ID || '',
-  CASHFREE_API_VERSION: process.env.CASHFREE_API_VERSION || '2024-12-01',
+  // MSG91 OTP SMS
+  MSG91_BASE_URL: process.env.MSG91_BASE_URL || '',
+  MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY || '',
+  MSG91_OTP_FLOW_ID: process.env.MSG91_OTP_FLOW_ID || '',
+  MSG91_SENDER_ID: process.env.MSG91_SENDER_ID || '',
   CVL_KRA_API_KEY: process.env.CVL_KRA_API_KEY || '',
   CVL_KRA_AES_KEY: process.env.CVL_KRA_AES_KEY || '',
   CVL_KRA_WEBHOOK_SECRET: process.env.CVL_KRA_WEBHOOK_SECRET || '',
