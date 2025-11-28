@@ -14,6 +14,7 @@ import userRoutes from './routes/user.routes.js';
 import stockRoutes from './routes/stock.routes.js';
 import subscriptionRoutes from './routes/subscription.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import supportRoutes from './routes/support.routes.js';
 import paymentWebhook from './webhooks/payment.webhook.js';
 import kycWebhook from './webhooks/kyc.webhook.js';
 
@@ -80,6 +81,7 @@ app.use('/user', userRoutes);
 app.use('/stocks', stockRoutes);
 app.use('/subscription', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/support', supportRoutes);
 
 // Webhooks
 app.use('/webhooks', paymentWebhook);

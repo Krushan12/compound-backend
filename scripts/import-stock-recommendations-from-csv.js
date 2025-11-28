@@ -95,7 +95,6 @@ async function main() {
       where: {
         symbol,
         companyName,
-        status: 'entry',
         dateOfRec: {
           gte: startOfDay,
           lte: endOfDay,
@@ -128,101 +127,6 @@ async function main() {
     });
 
     created += 1;
-  }
-
-  const pastCsvPath = path.resolve(__dirname, '../../stockdatapast.csv');
-  if (fs.existsSync(pastCsvPath)) {
-    const pastContent = fs.readFileSync(pastCsvPath, 'utf8');
-
-    const pastRecords = parse(pastContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
-
-    for (const row of pastRecords) {
-      const companyName = (row['Stock Name'] || '').toString().trim();
-      const symbolRaw = (row['Ticker'] || '').toString().trim();
-
-      if (!companyName || !symbolRaw) {
-        skipped += 1;
-        continue;
-      }
-
-      const symbol = symbolRaw.toUpperCase();
-
-      const returnsPct = parseReturns(row['Returns']);
-
-      const dateOfRecRaw = row['Date of Coverage '] || row['Date of Coverage'];
-      const dateOfClosureRaw = row['Date of Closure'];
-
-      let dateOfRec = parseDateOfCoverage(dateOfRecRaw, currentYear);
-      if (!dateOfRec) {
-        dateOfRec = new Date();
-      }
-
-      let exitedAt = parseDateOfCoverage(dateOfClosureRaw, currentYear);
-      if (!exitedAt) {
-        exitedAt = dateOfRec;
-      }
-
-      const entryMin = parseNumber(row['Entry Min']);
-      const entryMax = parseNumber(row['Entry Max']);
-
-      if (entryMin === null || entryMax === null) {
-        skipped += 1;
-        continue;
-      }
-
-      const entryZone = `${entryMin} - ${entryMax}`;
-
-      const exitPrice = (row['Stoploss/Exit Price'] ?? '').toString().trim();
-
-      const startOfDay = new Date(dateOfRec);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(dateOfRec);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const existingExited = await prisma.stockRecommendation.findFirst({
-        where: {
-          symbol,
-          companyName,
-          status: 'exited',
-          dateOfRec: {
-            gte: startOfDay,
-            lte: endOfDay,
-          },
-        },
-      });
-
-      if (existingExited) {
-        skipped += 1;
-        continue;
-      }
-
-      await prisma.stockRecommendation.create({
-        data: {
-          symbol,
-          companyName,
-          dateOfRec,
-          entryZone,
-          target1: exitPrice,
-          stopLoss: exitPrice,
-          potentialPct: returnsPct,
-          realisedPct: returnsPct,
-          status: 'exited',
-          pdfUrl: null,
-          pdfKey: null,
-          currentPrice: null,
-          lastPriceUpdate: null,
-          exitedAt,
-        },
-      });
-
-      created += 1;
-    }
-  } else {
-    console.warn('Past CSV file not found at', pastCsvPath, '- skipping exited stocks import');
   }
 
   console.log('Import complete');

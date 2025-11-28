@@ -3,7 +3,7 @@ import prisma from '../config/db.js';
 /**
  * Create or update subscription
  */
-export const createOrUpdateSubscription = async (userId, { plan, amount }) => {
+export const createOrUpdateSubscription = async (userId, { plan, amount, tier = 'basic' }) => {
   // Calculate expiry date based on plan
   const now = new Date();
   let expiresAt;
@@ -28,6 +28,7 @@ export const createOrUpdateSubscription = async (userId, { plan, amount }) => {
       status: 'ACTIVE',
       plan,
       amount,
+      tier,
       startedAt: new Date(),
       expiresAt,
     },
@@ -36,6 +37,7 @@ export const createOrUpdateSubscription = async (userId, { plan, amount }) => {
       status: 'ACTIVE',
       plan,
       amount,
+      tier,
       startedAt: new Date(),
       expiresAt,
     },
@@ -72,6 +74,11 @@ export const getUserSubscription = async (userId) => {
  * Cancel subscription
  */
 export const cancelSubscription = async (userId) => {
+  const existing = await prisma.subscription.findUnique({ where: { userId } });
+  if (!existing) {
+    // Nothing to cancel; treat as already inactive
+    return null;
+  }
   const subscription = await prisma.subscription.update({
     where: { userId },
     data: { status: 'CANCELLED' },

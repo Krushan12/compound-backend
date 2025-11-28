@@ -102,11 +102,11 @@ export const handlePaymentSuccess = async (payload) => {
 
 export const subscriptionStatus = async (userId) => {
   const sub = await prisma.subscription.findUnique({ where: { userId } });
-  return sub ? { status: sub.status, expiresAt: sub.expiresAt } : { status: 'INACTIVE' };
+  return sub ? { status: sub.status, expiresAt: sub.expiresAt, tier: sub.tier } : { status: 'INACTIVE' };
 };
 
 // Verify signature for one-time order payments and activate subscription for 30 days
-export const verifyOrderPayment = async (userId, { orderId, paymentId, signature, amount }) => {
+export const verifyOrderPayment = async (userId, { orderId, paymentId, signature, amount, tier = 'basic', plan = null }) => {
   const hmac = crypto.createHmac('sha256', env.RAZORPAY_KEY_SECRET);
   hmac.update(`${orderId}|${paymentId}`);
   const digest = hmac.digest('hex');
@@ -123,15 +123,28 @@ export const verifyOrderPayment = async (userId, { orderId, paymentId, signature
   const expiry = dayjs().add(30, 'day').toDate();
   await prisma.subscription.upsert({
     where: { userId },
-    update: { status: 'ACTIVE', expiresAt: expiry },
-    create: { userId, status: 'ACTIVE', expiresAt: expiry },
+    update: {
+      status: 'ACTIVE',
+      expiresAt: expiry,
+      tier,
+      amount: Number(amount),
+      plan: plan || undefined,
+    },
+    create: {
+      userId,
+      status: 'ACTIVE',
+      expiresAt: expiry,
+      tier,
+      amount: Number(amount),
+      plan: plan || undefined,
+    },
   });
 
   return { verified: true };
 };
 
 // Create a Razorpay plan (if needed) and a subscription; return subscription_id and keyId for client checkout
-export const createSubscription = async (userId, { plan, amount, customer }) => {
+export const createSubscription = async (userId, { plan, amount, customer, tier = 'basic' }) => {
   try {
     console.log('🔑 Razorpay Keys:', { 
       keyId: env.RAZORPAY_KEY_ID ? `${env.RAZORPAY_KEY_ID.substring(0, 8)}...` : 'MISSING',
@@ -176,7 +189,7 @@ export const createSubscription = async (userId, { plan, amount, customer }) => 
     });
     console.log('✅ Plan created:', planRes.id);
 
-    const notes = { userId };
+    const notes = { userId, tier };
     console.log('🔄 Creating subscription with plan:', planRes.id);
     const subRes = await instance.subscriptions.create({
       plan_id: planRes.id,

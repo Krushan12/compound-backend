@@ -34,14 +34,15 @@ export const subscriptionStatus = async (req, res) => {
 export const createSubscriptionIntentValidators = [
   body('plan').isIn(['monthly', 'quarterly', 'yearly']),
   body('amount').isFloat({ gt: 0 }),
+  body('tier').optional().isIn(['basic', 'advanced']),
 ];
 
 export const createSubscriptionIntent = async (req, res) => {
   try {
-    const { plan, amount, customer, couponCode } = req.body;
+    const { plan, amount, customer, couponCode, tier } = req.body;
     const finalAmount = couponCode === 'RAINBOWMONEY' ? 10 : amount;
     console.log('🎯 Creating subscription intent for user:', req.user.id, { plan, amount: finalAmount, couponCode });
-    const out = await PaymentService.createSubscription(req.user.id, { plan, amount: finalAmount, customer });
+    const out = await PaymentService.createSubscription(req.user.id, { plan, amount: finalAmount, customer, tier });
     return success(res, out, 'Subscription intent created');
   } catch (error) {
     console.error('❌ Subscription intent creation failed:', error);
@@ -60,16 +61,18 @@ export const verifySubscriptionValidators = [
   body('razorpay_signature').isString(),
   body('plan').isIn(['monthly', 'quarterly', 'yearly']),
   body('amount').isFloat({ gt: 0 }),
+  body('tier').optional().isIn(['basic', 'advanced']),
 ];
 
 export const verifySubscription = async (req, res) => {
-  const { razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan, amount } = req.body;
+  const { razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan, amount, tier } = req.body;
   const out = await PaymentService.verifySubscriptionPayment(req.user.id, {
     subscriptionId: razorpay_subscription_id,
     paymentId: razorpay_payment_id,
     signature: razorpay_signature,
     plan,
     amount,
+    tier,
   });
   return success(res, out, 'Subscription verified');
 };
@@ -79,15 +82,21 @@ export const verifyOrderValidators = [
   body('razorpay_payment_id').isString(),
   body('razorpay_signature').isString(),
   body('amount').isFloat({ gt: 0 }),
+  body('plan')
+    .optional()
+    .isIn(['monthly', 'quarterly', 'yearly', 'threeMonths', 'sixMonths', 'nineMonths']),
+  body('tier').optional().isIn(['basic', 'advanced']),
 ];
 
 export const verifyOrder = async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount, tier, plan } = req.body;
   const out = await PaymentService.verifyOrderPayment(req.user.id, {
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
     signature: razorpay_signature,
     amount,
+    tier,
+    plan,
   });
   return success(res, out, 'Order payment verified');
 };

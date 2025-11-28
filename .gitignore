@@ -13,3 +13,5 @@ cvl_node
 tests
 .env
 
+import-stock-recommendations-from-csv.js
+import-stock2.js

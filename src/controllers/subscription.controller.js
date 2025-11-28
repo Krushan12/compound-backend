@@ -5,18 +5,20 @@ import * as SubscriptionService from '../services/subscription.service.js';
 export const createSubscriptionValidators = [
   body('plan').isIn(['monthly', 'quarterly', 'yearly']).withMessage('Invalid plan'),
   body('amount').isFloat({ min: 0 }).withMessage('Invalid amount'),
+  body('tier').optional().isIn(['basic', 'advanced']).withMessage('Invalid tier'),
 ];
 
 /**
  * Create or update subscription
  */
 export const createSubscription = async (req, res) => {
-  const { plan, amount } = req.body;
+  const { plan, amount, tier } = req.body;
   const userId = req.user.id;
 
   const subscription = await SubscriptionService.createOrUpdateSubscription(userId, {
     plan,
     amount,
+    tier,
   });
 
   return success(res, { subscription }, 'Subscription created successfully');

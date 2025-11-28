@@ -26,6 +26,8 @@ export const env = {
   CVL_KRA_POSCODE: process.env.CVL_KRA_POSCODE || '',
   CVL_KRA_PASSWORD: process.env.CVL_KRA_PASSWORD || '',
   CVL_KRA_RTA_CODE: process.env.CVL_KRA_RTA_CODE || '',
+  // Priority chat admin mobiles (comma-separated list of mobile numbers)
+  SUPPORT_ADMIN_MOBILES: process.env.SUPPORT_ADMIN_MOBILES || '',
   // Firebase Admin (for phone auth token verification)
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
