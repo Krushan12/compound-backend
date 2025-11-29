@@ -52,6 +52,17 @@ export const createOrUpdateSubscription = async (userId, { plan, amount, tier = 
 export const getUserSubscription = async (userId) => {
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
+    select: {
+      userId: true,
+      status: true,
+      plan: true,
+      amount: true,
+      startedAt: true,
+      expiresAt: true,
+      createdAt: true,
+      updatedAt: true,
+      tier: true,
+    },
   });
   
   // Check if subscription is expired
