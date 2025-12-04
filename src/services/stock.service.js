@@ -39,16 +39,7 @@ function parsePrice(priceStr) {
   const match = cleaned.match(/(\d+\.?\d*)/);
   return match ? parseFloat(match[1]) : null;
 }
-  
-  // Try single value
-  const singleMatch = cleaned.match(/(\d+\.?\d*)/);
-  if (singleMatch) {
-    const val = parseFloat(singleMatch[1]);
-    return { min: val, max: val };
-  }
-  
-  return null;
-}
+
 
 /**
  * Calculate live returns for stocks that are not yet exited
