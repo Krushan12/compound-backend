@@ -1,5 +1,5 @@
 import express from 'express';
-import { notifyNewStock, notifyStockUpdate } from '../services/notification.service.js';
+import { notifyNewStock, notifyStockUpdate, sendToTopic, sendToDevice } from '../services/notification.service.js';
 
 const router = express.Router();
 
@@ -45,6 +45,36 @@ router.post('/stock-update', async (req, res) => {
     res.json({ success: true, message: 'Update notification sent' });
   } catch (error) {
     console.error('Error sending stock update notification:', error);
+    res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+/**
+ * POST /api/notifications/custom
+ * Send a custom notification to a topic or a specific device token
+ */
+router.post('/custom', async (req, res) => {
+  try {
+    const { title, body, data = {}, topic, token } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!topic && !token) {
+      return res.status(400).json({ error: 'Provide topic or token' });
+    }
+
+    let result;
+    if (token) {
+      result = await sendToDevice(token, { title, body, data });
+    } else {
+      result = await sendToTopic(topic || 'stock_recommendations', { title, body, data });
+    }
+
+    res.json({ success: true, message: 'Notification sent', result });
+  } catch (error) {
+    console.error('Error sending custom notification:', error);
     res.status(500).json({ error: 'Failed to send notification' });
   }
 });
