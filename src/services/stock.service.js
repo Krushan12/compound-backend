@@ -17,11 +17,28 @@ function parseEntryZone(entryZone) {
   if (rangeMatch) {
     const val1 = parseFloat(rangeMatch[1]);
     const val2 = parseFloat(rangeMatch[2]);
-    return {
-      min: Math.min(val1, val2),
-      max: Math.max(val1, val2),
-    };
+    return { min: Math.min(val1, val2), max: Math.max(val1, val2) };
   }
+  
+  // Try single value
+  const singleMatch = cleaned.match(/(\d+\.?\d*)/);
+  if (singleMatch) {
+    const val = parseFloat(singleMatch[1]);
+    return { min: val, max: val };
+  }
+  
+  return null;
+}
+
+/**
+ * Parse target/exit/stop strings to numeric value (e.g., "₹760")
+ */
+function parsePrice(priceStr) {
+  if (!priceStr) return null;
+  const cleaned = priceStr.replace(/[₹$,]/g, '').trim();
+  const match = cleaned.match(/(\d+\.?\d*)/);
+  return match ? parseFloat(match[1]) : null;
+}
   
   // Try single value
   const singleMatch = cleaned.match(/(\d+\.?\d*)/);
@@ -64,13 +81,35 @@ function calculateLiveReturns(stock) {
 }
 
 /**
+ * Compute Potential Left = ((Target - Avg Entry)/Avg Entry) * 100
+ * Uses stock.averageEntry if available; otherwise falls back to midpoint of entryZone
+ */
+function computePotentialLeft(stock) {
+  let avgEntry = stock.averageEntry;
+  if (avgEntry === null || avgEntry === undefined) {
+    const entry = parseEntryZone(stock.entryZone);
+    if (!entry) return null;
+    avgEntry = (entry.min + entry.max) / 2;
+  }
+  if (!avgEntry || avgEntry === 0) return null;
+
+  const target = parsePrice(stock.target1);
+  if (target === null || target === undefined) return null;
+
+  const potential = ((target - avgEntry) / avgEntry) * 100;
+  return parseFloat(potential.toFixed(2));
+}
+
+/**
  * Enrich stock data with calculated live returns
  */
 function enrichStockWithReturns(stock) {
   const liveReturns = calculateLiveReturns(stock);
+  const potentialLeft = computePotentialLeft(stock);
   return {
     ...stock,
     realisedPct: liveReturns !== null ? liveReturns : stock.realisedPct,
+    potentialPct: potentialLeft !== null ? potentialLeft : stock.potentialPct,
   };
 }
 
