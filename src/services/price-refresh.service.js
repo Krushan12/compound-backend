@@ -132,9 +132,14 @@ export async function refreshAllPrices() {
         }
 
         if (newStatus === 'exit' && !wasExited) {
-          const entry = parseEntryZone(stock.entryZone);
-          if (entry) {
-            const avgEntry = (entry.min + entry.max) / 2;
+          let avgEntry = stock.averageEntry;
+          if (avgEntry === null || avgEntry === undefined) {
+            const entry = parseEntryZone(stock.entryZone);
+            if (entry) {
+              avgEntry = (entry.min + entry.max) / 2;
+            }
+          }
+          if (avgEntry !== null && avgEntry !== undefined && avgEntry !== 0) {
             realisedPct = parseFloat((((currentPrice - avgEntry) / avgEntry) * 100).toFixed(2));
             exitedAt = new Date();
           }
@@ -222,9 +227,14 @@ export async function refreshStockPrice(stockId) {
   }
 
   if (newStatus === 'exit' && !wasExited) {
-    const entry = parseEntryZone(stock.entryZone);
-    if (entry) {
-      const avgEntry = (entry.min + entry.max) / 2;
+    let avgEntry = stock.averageEntry;
+    if (avgEntry === null || avgEntry === undefined) {
+      const entry = parseEntryZone(stock.entryZone);
+      if (entry) {
+        avgEntry = (entry.min + entry.max) / 2;
+      }
+    }
+    if (avgEntry !== null && avgEntry !== undefined && avgEntry !== 0) {
       realisedPct = parseFloat((((currentPrice - avgEntry) / avgEntry) * 100).toFixed(2));
       exitedAt = new Date();
     }

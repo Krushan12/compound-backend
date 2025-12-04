@@ -51,33 +51,49 @@ function logKV(title, value) {
 
 // --- CVL KRA status code mapping ---
 function mapAppStatus(appStatus) {
-  const code = String(appStatus || '').padStart(3, '0');
-  const VERIFIED = new Set(['002', '007', '012', '022']);
-  const PENDING = new Set(['000', '001', '003']);
-  const FAILED = new Set(['004', '006', '014', '999']);
+  const code = String(appStatus ?? '').trim();
+  if (!code) {
+    return { status: 'PENDING', description: 'Not available' };
+  }
+  const norm = code.padStart(3, '0');
+  const last2 = norm.slice(-2); // vendor-agnostic suffix per spec
 
-  const descriptions = {
-    '000': 'Not checked with respective KRA',
-    '001': 'Submitted',
-    '002': 'KRA Verified',
-    '003': 'Hold',
-    '004': 'Rejected',
-    '005': 'Not available',
-    '006': 'Deactivated',
-    '007': 'KRA Validated',
-    '011': 'Existing KYC Submitted',
-    '012': 'Existing KYC Verified',
-    '013': 'Existing KYC Hold',
-    '014': 'Existing KYC Rejected',
-    '022': 'KYC Registered with CVLMF',
-    '888': 'Not checked with Multiple KRA',
-    '999': 'Invalid PAN No Format',
-  };
-
-  if (VERIFIED.has(code)) return { status: 'VERIFIED', description: descriptions[code] || 'Verified' };
-  if (FAILED.has(code)) return { status: 'FAILED', description: descriptions[code] || 'Failed' };
-  if (PENDING.has(code)) return { status: 'PENDING', description: descriptions[code] || 'Pending' };
-  return { status: 'PENDING', description: descriptions[code] || 'Pending' };
+  // Map by suffix across vendors
+  switch (last2) {
+    case '00':
+      return { status: 'PENDING', description: 'Not checked with respective KRA' };
+    case '01':
+      return { status: 'PENDING', description: 'Submitted' };
+    case '02':
+      return { status: 'VERIFIED', description: 'KRA Verified' };
+    case '03':
+      return { status: 'PENDING', description: 'Hold' };
+    case '04':
+      return { status: 'FAILED', description: 'Rejected' };
+    case '05':
+      return { status: 'PENDING', description: 'Not available' };
+    case '06':
+      return { status: 'FAILED', description: 'Deactivated' };
+    case '07':
+      return { status: 'VALIDATED', description: 'KRA Validated' };
+    case '11':
+      return { status: 'PENDING', description: 'Existing KYC Submitted' };
+    case '12':
+      return { status: 'VERIFIED', description: 'Existing KYC Verified' };
+    case '13':
+      return { status: 'PENDING', description: 'Existing KYC Hold' };
+    case '14':
+      return { status: 'FAILED', description: 'Existing KYC Rejected' };
+    case '22':
+      return { status: 'VERIFIED', description: 'KYC Registered with CVLMF' };
+    case '88':
+      return { status: 'PENDING', description: 'Not checked with Multiple KRA' };
+    case '99':
+      // Covers 999 (Invalid PAN No Format)
+      return { status: 'FAILED', description: 'Invalid PAN No Format' };
+    default:
+      return { status: 'PENDING', description: 'Pending' };
+  }
 }
 
 export async function cvlGetToken() {
@@ -283,12 +299,14 @@ export async function checkByPan(userId, pan, name) {
   const cvlSuccess = parsedResult.success === '1' || parsedResult.success === 1;
   let kycStatus = 'FAILED';
   let statusDescription = undefined;
+  let appStatusCode = undefined;
   if (parsedResult.resdtls) {
     try {
       const details = typeof parsedResult.resdtls === 'string'
         ? JSON.parse(parsedResult.resdtls)
         : parsedResult.resdtls;
       const appStatus = details?.APP_PAN_INQ?.APP_STATUS;
+      appStatusCode = appStatus;
       const mapped = mapAppStatus(appStatus);
       kycStatus = mapped.status;
       statusDescription = mapped.description;
@@ -304,6 +322,8 @@ export async function checkByPan(userId, pan, name) {
   
   return {
     status: kycStatus,
+    statusDescription,
+    appStatus: appStatusCode,
     pan: pan.toUpperCase(),
     name: name,
     cvlResponse: parsedResult,

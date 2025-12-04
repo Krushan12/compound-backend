@@ -46,15 +46,17 @@ function calculateLiveReturns(stock) {
   }
   
   // For entry/hold stocks, calculate live returns based on current price
-  // Need current price and entry zone to calculate
-  if (!stock.currentPrice || !stock.entryZone) {
+  // Need current price and either averageEntry or entry zone to calculate
+  if (!stock.currentPrice || (!stock.averageEntry && !stock.entryZone)) {
     return null;
   }
   
-  const entry = parseEntryZone(stock.entryZone);
-  if (!entry) return null;
-  
-  const avgEntry = (entry.min + entry.max) / 2;
+  let avgEntry = stock.averageEntry;
+  if (avgEntry === null || avgEntry === undefined) {
+    const entry = parseEntryZone(stock.entryZone);
+    if (!entry) return null;
+    avgEntry = (entry.min + entry.max) / 2;
+  }
   if (avgEntry === 0) return null;
   
   const returns = ((stock.currentPrice - avgEntry) / avgEntry) * 100;
@@ -177,7 +179,7 @@ export const getPerformanceStats = async () => {
     where: {
       realisedPct: { not: null },
     },
-    select: { realisedPct: true, stopLoss: true, target: true, entryZone: true },
+    select: { realisedPct: true, stopLoss: true, entryZone: true, averageEntry: true },
   });
 
   const winningCalls = stocksWithReturns.filter(s => s.realisedPct > 0);
@@ -199,9 +201,12 @@ export const getPerformanceStats = async () => {
   const stocksWithStopLoss = stocksWithReturns.filter(s => s.stopLoss && s.entryZone);
   const avgDownside = stocksWithStopLoss.length > 0
     ? stocksWithStopLoss.reduce((sum, s) => {
-        const entry = parseEntryZone(s.entryZone);
-        if (!entry || !s.stopLoss) return sum;
-        const avgEntry = (entry.min + entry.max) / 2;
+        let avgEntry = s.averageEntry;
+        if (avgEntry === null || avgEntry === undefined) {
+          const entry = parseEntryZone(s.entryZone);
+          if (!entry || !s.stopLoss) return sum;
+          avgEntry = (entry.min + entry.max) / 2;
+        }
         const downside = ((s.stopLoss - avgEntry) / avgEntry) * 100;
         return sum + downside;
       }, 0) / stocksWithStopLoss.length

@@ -1,7 +1,16 @@
 import admin from 'firebase-admin';
-import env from './env.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 let initialized = false;
+// --- ADD THIS BLOCK ---
+// Force-set the WIF credentials path to ensure it is ALWAYS found
+import path from 'path';
+// Use the absolute path you verified works
+process.env.GOOGLE_APPLICATION_CREDENTIALS = "/home/ubuntu/compound-backend/wif-config.json";
+console.log(`🔧 Enforced Credentials Path: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+// ----------------------
+//
 
 /**
  * Initialize Firebase Admin SDK
@@ -24,26 +33,17 @@ export const initializeFirebaseAdmin = () => {
   }
 
   try {
-    // Try explicit credentials first (for production)
-    if (env.FIREBASE_PROJECT_ID && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: env.FIREBASE_PROJECT_ID,
-          clientEmail: env.FIREBASE_CLIENT_EMAIL,
-          privateKey: env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }),
-      });
-      initialized = true;
-      console.log('✅ Firebase Admin initialized with service account');
-    } else {
-      // Fall back to ADC (Application Default Credentials)
-      // This works if you're logged in with: gcloud auth application-default login
-      console.log('🔄 Attempting to initialize Firebase with ADC...');
-      admin.initializeApp();
-      initialized = true;
-      const projectId = admin.app().options.projectId;
-      console.log(`✅ Firebase Admin initialized with ADC (Project: ${projectId})`);
-    }
+    // Initialize with Application Default Credentials (ADC). This supports
+    // Workload Identity Federation (external_account JSON via GOOGLE_APPLICATION_CREDENTIALS).
+    console.log('🔄 Initializing Firebase Admin using Application Default Credentials (ADC)...');
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      // Explicitly set projectId for Workload Identity Federation in non-GCP environments
+      projectId: 'rainbow-money-450af',
+    });
+    initialized = true;
+    const projectId = admin.app().options.projectId;
+    console.log(`✅ Firebase Admin initialized with ADC (Project: ${projectId || 'unknown'})`);
   } catch (error) {
     console.error('❌ Error initializing Firebase Admin:', error.message);
     console.error('❌ Full error:', error);

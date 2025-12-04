@@ -119,8 +119,22 @@ export const verifyOrderPayment = async (userId, { orderId, paymentId, signature
     data: { status: 'SUCCESS' },
   });
 
-  // Activate access for 30 days on successful payment (simple paywall)
-  const expiry = dayjs().add(30, 'day').toDate();
+  // Compute expiry based on selected one-time plan
+  // Supported: threeMonths, sixMonths, nineMonths, yearly (12 months)
+  let months = 1;
+  switch (plan) {
+    case 'threeMonths':
+      months = 3; break;
+    case 'sixMonths':
+      months = 6; break;
+    case 'nineMonths':
+      months = 9; break;
+    case 'yearly':
+      months = 12; break;
+    default:
+      months = 1; // fallback
+  }
+  const expiry = dayjs().add(months, 'month').toDate();
   await prisma.subscription.upsert({
     where: { userId },
     update: {
@@ -137,6 +151,7 @@ export const verifyOrderPayment = async (userId, { orderId, paymentId, signature
       tier,
       amount: Number(amount),
       plan: plan || undefined,
+      startedAt: new Date(),
     },
   });
 

@@ -83,6 +83,7 @@ model StockRecommendation {
   companyName  String
   dateOfRec    DateTime
   entryZone    String
+  averageEntry Float?
   target1      String
   stopLoss     String
   potentialPct Float
