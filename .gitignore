@@ -22,3 +22,6 @@ ecosystem.config.cjs
 wif-config.json
 scripts/test-fcm-wif.js
 
+*.swp
+*.swo
+
