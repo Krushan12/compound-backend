@@ -15,3 +15,10 @@ tests
 
 import-stock-recommendations-from-csv.js
 import-stock2.js
+# PM2 ecosystem file (optional)
+ecosystem.config.cjs
+
+# Firebase / WIF sensitive keys
+wif-config.json
+scripts/test-fcm-wif.js
+
