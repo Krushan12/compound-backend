@@ -59,31 +59,12 @@ function parsePrice(priceStr) {
  * - Otherwise -> status is 'hold'
  */
 function determineStatus(currentPrice, entryZone, target, stopLoss, currentStatus) {
-  const entry = parseEntryZone(entryZone);
-  const targetPrice = parsePrice(target);
-  const stopLossPrice = parsePrice(stopLoss);
-  
-  if (!entry || !stopLossPrice) {
-    return currentStatus; // Need at minimum entry zone & stop loss to evaluate
-  }
-  
-  // Don't change status if already exited
-    
-  // Exit conditions
-  if (currentPrice <= stopLossPrice) {
-    return 'exit'; // Stop loss hit
-  }
-  if (targetPrice !== null && targetPrice !== undefined && currentPrice >= targetPrice) {
-    return 'exit'; // Target achieved
-  }
-  
-  // Within entry zone -> Entry
-  if (currentPrice >= entry.min && currentPrice <= entry.max) {
-    return 'entry';
-  }
-  
-  // Otherwise, Hold (live position outside entry range)
-  return 'hold';
+  // Manual mode: keep status as-is; admin controls it from dashboard.
+  // const entry = parseEntryZone(entryZone);
+  // const targetPrice = parsePrice(target);
+  // const stopLossPrice = parsePrice(stopLoss);
+  // ... auto-evaluation logic disabled ...
+  return currentStatus;
 }
 
 /**
@@ -110,62 +91,17 @@ export async function refreshAllPrices() {
 
         const currentPrice = nseQuote.price;
 
-        const targetValue = stock.target ?? stock.target1;
-
-        const newStatus = determineStatus(
-          currentPrice,
-          stock.entryZone,
-          targetValue,
-          stock.stopLoss,
-          stock.status
-        );
-
-        let realisedPct = stock.realisedPct;
-        let exitedAt = stock.exitedAt;
-
-        const wasExited = stock.status === 'exit' || stock.status === 'exited';
-        const isNowActive = newStatus === 'entry' || newStatus === 'hold';
-
-        if (wasExited && isNowActive) {
-          realisedPct = null;
-          exitedAt = null;
-        }
-
-        if (newStatus === 'exit' && !wasExited) {
-          let avgEntry = stock.averageEntry;
-          if (avgEntry === null || avgEntry === undefined) {
-            const entry = parseEntryZone(stock.entryZone);
-            if (entry) {
-              avgEntry = (entry.min + entry.max) / 2;
-            }
-          }
-          if (avgEntry !== null && avgEntry !== undefined && avgEntry !== 0) {
-            realisedPct = parseFloat((((currentPrice - avgEntry) / avgEntry) * 100).toFixed(2));
-            exitedAt = new Date();
-          }
-        }
-
-        if (realisedPct !== null && realisedPct !== undefined) {
-          realisedPct = parseFloat(realisedPct.toFixed(2));
-        }
-
+        // Manual mode: do not auto-change status/returns/exitedAt.
         await prisma.stockRecommendation.update({
           where: { id: stock.id },
           data: {
             currentPrice,
             lastPriceUpdate: new Date(),
-            status: newStatus,
-            realisedPct: realisedPct,
-            exitedAt: exitedAt,
           },
         });
 
         updated++;
-
-        if (newStatus !== stock.status) {
-          const returnInfo = realisedPct !== null ? ` | Returns: ${realisedPct > 0 ? '+' : ''}${realisedPct}%` : '';
-          logger.info(`Status changed for ${stock.symbol}: ${stock.status} -> ${newStatus} (Price: ₹${currentPrice}${returnInfo})`);
-        }
+        // Status change logging disabled in manual mode
 
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
@@ -205,60 +141,15 @@ export async function refreshStockPrice(stockId) {
 
   const currentPrice = nseQuote.price;
 
-  const targetValue = stock.target ?? stock.target1;
-
-  const newStatus = determineStatus(
-    currentPrice,
-    stock.entryZone,
-    targetValue,
-    stock.stopLoss,
-    stock.status
-  );
-
-  let realisedPct = stock.realisedPct;
-  let exitedAt = stock.exitedAt;
-
-  const wasExited = stock.status === 'exit' || stock.status === 'exited';
-  const isNowActive = newStatus === 'entry' || newStatus === 'hold';
-
-  if (wasExited && isNowActive) {
-    realisedPct = null;
-    exitedAt = null;
-  }
-
-  if (newStatus === 'exit' && !wasExited) {
-    let avgEntry = stock.averageEntry;
-    if (avgEntry === null || avgEntry === undefined) {
-      const entry = parseEntryZone(stock.entryZone);
-      if (entry) {
-        avgEntry = (entry.min + entry.max) / 2;
-      }
-    }
-    if (avgEntry !== null && avgEntry !== undefined && avgEntry !== 0) {
-      realisedPct = parseFloat((((currentPrice - avgEntry) / avgEntry) * 100).toFixed(2));
-      exitedAt = new Date();
-    }
-  }
-
-  if (realisedPct !== null && realisedPct !== undefined) {
-    realisedPct = parseFloat(realisedPct.toFixed(2));
-  }
-
+  // Manual mode: only update price/time; keep status/returns/exitedAt unchanged
   const updatedStock = await prisma.stockRecommendation.update({
     where: { id: stockId },
     data: {
       currentPrice,
       lastPriceUpdate: new Date(),
-      status: newStatus,
-      realisedPct: realisedPct,
-      exitedAt: exitedAt,
     },
   });
-
-  if (newStatus !== stock.status) {
-    const returnInfo = realisedPct !== null ? ` | Returns: ${realisedPct > 0 ? '+' : ''}${realisedPct}%` : '';
-    logger.info(`Status changed for ${stock.symbol}: ${stock.status} -> ${newStatus} (Price: ₹${currentPrice}${returnInfo})`);
-  }
+  // Status change logging disabled in manual mode
 
   return updatedStock;
 }
@@ -358,8 +249,8 @@ export function startPriceRefreshScheduler() {
 
       globalThis.__priceRefreshSchedulerPending = true;
       await refreshAllPrices();
-      // Also check for stocks to move to past performance
-      await moveExitedStocksToPastPerformance();
+      // Manual mode: do not auto-move stocks to past performance
+      // await moveExitedStocksToPastPerformance();
     } catch (error) {
       logger.error('Scheduled price refresh failed:', error);
     } finally {
