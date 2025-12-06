@@ -61,20 +61,6 @@ function resolveAverageEntry(stock) {
   return avgEntry;
 }
 
-// Strict resolver: ONLY use averageEntry (no fallback to entryZone midpoint)
-function resolveAverageEntryStrict(stock) {
-  let avgEntry = stock.averageEntry;
-  if (typeof avgEntry === 'string') {
-    const cleaned = avgEntry.replace(/[₹$,]/g, '').trim();
-    const parsed = parseFloat(cleaned);
-    avgEntry = Number.isFinite(parsed) ? parsed : null;
-  }
-  if (avgEntry === null || avgEntry === undefined || Number.isNaN(avgEntry)) {
-    return null;
-  }
-  return avgEntry;
-}
-
 
 /**
  * Calculate live returns for stocks that are not yet exited
@@ -89,13 +75,12 @@ function calculateLiveReturns(stock) {
   }
   
   // For entry/hold stocks, calculate live returns based on current price
-  // ONLY when averageEntry is available. Do NOT fallback to entry zone midpoint.
-  if (!stock.currentPrice) {
+  // Need current price and either averageEntry or entry zone to calculate
+  if (!stock.currentPrice || (!stock.averageEntry && !stock.entryZone)) {
     return null;
   }
-
-  const avgEntry = resolveAverageEntryStrict(stock);
-  if (avgEntry === null || avgEntry === undefined) return null;
+  
+  const avgEntry = resolveAverageEntry(stock);
   if (avgEntry === 0) return null;
   
   const returns = ((stock.currentPrice - avgEntry) / avgEntry) * 100;
@@ -121,7 +106,7 @@ function calculateLiveReturns(stock) {
  * Uses stock.averageEntry if available; otherwise falls back to midpoint of entryZone
  */
 function computePotentialLeft(stock) {
-  const avgEntry = resolveAverageEntryStrict(stock);
+  const avgEntry = resolveAverageEntry(stock);
   if (!avgEntry || avgEntry === 0) return null;
 
   const target = parsePrice(stock.target1);
@@ -268,11 +253,15 @@ export const getPerformanceStats = async () => {
     : 0;
 
   // Calculate average downside based on stop loss
-  const stocksWithStopLoss = stocksWithReturns.filter(s => s.stopLoss);
+  const stocksWithStopLoss = stocksWithReturns.filter(s => s.stopLoss && s.entryZone);
   const avgDownside = stocksWithStopLoss.length > 0
     ? stocksWithStopLoss.reduce((sum, s) => {
-        const avgEntry = resolveAverageEntryStrict(s);
-        if (avgEntry === null || avgEntry === undefined || avgEntry === 0) return sum;
+        let avgEntry = s.averageEntry;
+        if (avgEntry === null || avgEntry === undefined) {
+          const entry = parseEntryZone(s.entryZone);
+          if (!entry || !s.stopLoss) return sum;
+          avgEntry = (entry.min + entry.max) / 2;
+        }
         const downside = ((s.stopLoss - avgEntry) / avgEntry) * 100;
         return sum + downside;
       }, 0) / stocksWithStopLoss.length
