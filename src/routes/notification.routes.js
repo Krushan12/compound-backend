@@ -1,5 +1,6 @@
 import express from 'express';
 import { notifyNewStock, notifyStockUpdate, sendToTopic, sendToDevice } from '../services/notification.service.js';
+import { refreshStockPrice } from '../services/price-refresh.service.js';
 
 const router = express.Router();
 
@@ -16,6 +17,14 @@ router.post('/new-stock', async (req, res) => {
     }
 
     await notifyNewStock({ id, symbol, companyName, status });
+
+    try {
+      if (id) {
+        await refreshStockPrice(id);
+      }
+    } catch (e) {
+      console.error('Error refreshing price for new stock:', e);
+    }
 
     res.json({ success: true, message: 'Notification sent' });
   } catch (error) {

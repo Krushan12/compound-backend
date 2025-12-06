@@ -10,7 +10,12 @@ function parseEntryZone(entryZone) {
   if (!entryZone) return null;
   
   // Remove currency symbols and extra spaces
-  const cleaned = entryZone.replace(/[₹$,]/g, '').trim();
+  let cleaned = entryZone.replace(/[₹$,]/g, '').trim();
+  // Normalize common range separators: en dash, em dash, and the word 'to'
+  cleaned = cleaned
+    .replace(/[–—]/g, '-')        // unicode dashes -> hyphen
+    .replace(/\bto\b/gi, '-')   // 'to' -> hyphen
+    .replace(/\s+/g, ' ');
   
   // Try to match range pattern (e.g., "650-570" or "650 - 570")
   const rangeMatch = cleaned.match(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)/);
@@ -40,6 +45,22 @@ function parsePrice(priceStr) {
   return match ? parseFloat(match[1]) : null;
 }
 
+// Resolve average entry preferring explicit value; fallback to midpoint of entryZone
+function resolveAverageEntry(stock) {
+  let avgEntry = stock.averageEntry;
+  if (typeof avgEntry === 'string') {
+    const cleaned = avgEntry.replace(/[₹$,]/g, '').trim();
+    const parsed = parseFloat(cleaned);
+    avgEntry = Number.isFinite(parsed) ? parsed : null;
+  }
+  if (avgEntry === null || avgEntry === undefined || Number.isNaN(avgEntry)) {
+    const entry = parseEntryZone(stock.entryZone);
+    if (!entry) return null;
+    avgEntry = (entry.min + entry.max) / 2;
+  }
+  return avgEntry;
+}
+
 
 /**
  * Calculate live returns for stocks that are not yet exited
@@ -59,12 +80,7 @@ function calculateLiveReturns(stock) {
     return null;
   }
   
-  let avgEntry = stock.averageEntry;
-  if (avgEntry === null || avgEntry === undefined) {
-    const entry = parseEntryZone(stock.entryZone);
-    if (!entry) return null;
-    avgEntry = (entry.min + entry.max) / 2;
-  }
+  const avgEntry = resolveAverageEntry(stock);
   if (avgEntry === 0) return null;
   
   const returns = ((stock.currentPrice - avgEntry) / avgEntry) * 100;
@@ -76,12 +92,7 @@ function calculateLiveReturns(stock) {
  * Uses stock.averageEntry if available; otherwise falls back to midpoint of entryZone
  */
 function computePotentialLeft(stock) {
-  let avgEntry = stock.averageEntry;
-  if (avgEntry === null || avgEntry === undefined) {
-    const entry = parseEntryZone(stock.entryZone);
-    if (!entry) return null;
-    avgEntry = (entry.min + entry.max) / 2;
-  }
+  const avgEntry = resolveAverageEntry(stock);
   if (!avgEntry || avgEntry === 0) return null;
 
   const target = parsePrice(stock.target1);
