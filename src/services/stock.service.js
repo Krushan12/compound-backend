@@ -84,7 +84,21 @@ function calculateLiveReturns(stock) {
   if (avgEntry === 0) return null;
   
   const returns = ((stock.currentPrice - avgEntry) / avgEntry) * 100;
-  return parseFloat(returns.toFixed(2));
+  const rounded = parseFloat(returns.toFixed(2));
+  if (process.env.DEBUG_RETURNS === '1') {
+    try {
+      console.log('[RETURNS]', {
+        symbol: stock.symbol,
+        status: stock.status,
+        avgEntryRaw: stock.averageEntry,
+        avgEntryResolved: avgEntry,
+        entryZone: stock.entryZone,
+        currentPrice: stock.currentPrice,
+        realisedPct: rounded,
+      });
+    } catch (_) {}
+  }
+  return rounded;
 }
 
 /**
