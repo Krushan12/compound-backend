@@ -1,4 +1,4 @@
-import { body, query } from 'express-validator';
+import { body, query, param } from 'express-validator';
 import { success } from '../utils/response.js';
 import * as SupportService from '../services/support.service.js';
 
@@ -31,7 +31,30 @@ export const postPublicChatMessage = async (req, res) => {
   return success(res, { message }, 'Message posted');
 };
 
+export const getMeAdminStatus = async (req, res) => {
+  const isAdmin = SupportService.isAdminUser(req.user.mobile);
+  return success(res, { isAdmin }, 'OK');
+};
+
+export const deletePublicChatMessageValidators = [
+  param('id').isString().trim().notEmpty().withMessage('id is required'),
+];
+
+export const deletePublicChatMessage = async (req, res) => {
+  const userId = req.user.id;
+  await SupportService.assertAdvancedAccess(userId);
+  const isAdmin = SupportService.isAdminUser(req.user.mobile);
+  if (!isAdmin) {
+    return res.status(403).json({ success: false, message: 'Only Compound Team can delete messages' });
+  }
+  const { id } = req.params;
+  await SupportService.deletePublicChatMessage(id);
+  return success(res, { id }, 'Message deleted');
+};
+
 export default {
   getPublicChatMessages,
   postPublicChatMessage,
+  getMeAdminStatus,
+  deletePublicChatMessage,
 };

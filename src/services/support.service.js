@@ -64,4 +64,12 @@ export const createPublicChatMessage = async (userId, mobile, text) => {
   return message;
 };
 
-export default { isAdminUser, assertAdvancedAccess, listPublicChatMessages, createPublicChatMessage };
+export const deletePublicChatMessage = async (id) => {
+  // Assumes access control is handled at controller layer
+  const deleted = await prisma.publicChatMessage.delete({
+    where: { id },
+  });
+  return deleted;
+};
+
+export default { isAdminUser, assertAdvancedAccess, listPublicChatMessages, createPublicChatMessage, deletePublicChatMessage };
