@@ -3,12 +3,37 @@ import axios from 'axios';
 import env from '../config/env.js';
 import prisma from '../config/db.js';
 
+const DEMO_MOBILE = '9999999999';
+const DEMO_OTP = '123456';
+
 // Generate a 6-digit OTP code
 const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // Send OTP using MSG91 Flow API
 export const sendOtp = async (mobile) => {
   const normalizedMobile = String(mobile).replace(/\D/g, '').slice(-10);
+
+  if (normalizedMobile === DEMO_MOBILE) {
+    const otpCode = DEMO_OTP;
+
+    await prisma.mobileOtp.upsert({
+      where: { mobile: normalizedMobile },
+      update: {
+        code: otpCode,
+        provider: 'demo',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        attempts: 0,
+      },
+      create: {
+        mobile: normalizedMobile,
+        code: otpCode,
+        provider: 'demo',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    });
+
+    return { mobile: normalizedMobile, provider: 'demo' };
+  }
 
   const baseUrl = env.MSG91_BASE_URL || 'https://control.msg91.com/api/v5';
   const authKey = env.MSG91_AUTH_KEY;
