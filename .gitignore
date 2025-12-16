@@ -25,3 +25,4 @@ scripts/test-fcm-wif.js
 *.swp
 *.swo
 
+scripts/import-subscriptions-from-details-csv.js

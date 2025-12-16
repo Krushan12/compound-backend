@@ -47,18 +47,30 @@ export const listPublicChatMessages = async ({ limit = 50 } = {}) => {
           mobile: true,
         },
       },
+      replyTo: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mobile: true,
+            },
+          },
+        },
+      },
     },
   });
   return messages;
 };
 
-export const createPublicChatMessage = async (userId, mobile, text) => {
+export const createPublicChatMessage = async (userId, mobile, text, replyToId = null) => {
   const isAdmin = isAdminUser(mobile);
   const message = await prisma.publicChatMessage.create({
     data: {
       userId,
       text,
       isAdmin,
+      replyToId: replyToId || null,
     },
   });
   return message;

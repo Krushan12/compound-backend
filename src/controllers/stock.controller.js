@@ -22,7 +22,9 @@ export const getStocksByStatusValidators = [
 
 // Controllers
 export const getAllStocks = async (req, res) => {
+  const userId = req.user?.id;
   const filters = {
+    userId,
     status: req.query.status,
     search: req.query.search,
     page: parseInt(req.query.page) || 1,
@@ -34,12 +36,14 @@ export const getAllStocks = async (req, res) => {
 };
 
 export const getActiveStocks = async (req, res) => {
-  const stocks = await StockService.getActiveStocks();
+  const userId = req.user?.id;
+  const stocks = await StockService.getActiveStocks({ userId });
   return success(res, { stocks }, 'Active stocks fetched successfully');
 };
 
 export const getStockById = async (req, res) => {
-  const stock = await StockService.getStockById(req.params.id);
+  const userId = req.user?.id;
+  const stock = await StockService.getStockById(req.params.id, { userId });
   return success(res, { stock }, 'Stock fetched successfully');
 };
 
@@ -49,7 +53,8 @@ export const getPerformanceStats = async (req, res) => {
 };
 
 export const getStocksByStatus = async (req, res) => {
-  const stocks = await StockService.getStocksByStatus(req.params.status);
+  const userId = req.user?.id;
+  const stocks = await StockService.getStocksByStatus(req.params.status, { userId });
   return success(res, { stocks }, `${req.params.status} stocks fetched successfully`);
 };
 

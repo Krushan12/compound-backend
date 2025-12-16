@@ -1,6 +1,17 @@
 import { PrismaClient } from '@prisma/client';
+import * as SubscriptionService from './subscription.service.js';
 
 const prisma = new PrismaClient();
+
+async function buildPlanTagWhereForUser(userId) {
+  const subscription = await SubscriptionService.getUserSubscription(userId);
+  const tier = (subscription?.tier || 'basic').toLowerCase();
+  if (subscription && subscription.status === 'ACTIVE' && tier === 'advanced') {
+    return {};
+  }
+  // Default: basic visibility
+  return { planTag: 'basic' };
+}
 
 /**
  * Parse entry zone string to get min and max values
@@ -133,9 +144,11 @@ function enrichStockWithReturns(stock) {
  * Get all stock recommendations with optional filters
  */
 export const getAllStocks = async (filters = {}) => {
-  const { status, search, page = 1, limit = 10 } = filters;
+  const { userId, status, search, page = 1, limit = 10 } = filters;
   
-  const where = {};
+  const where = {
+    ...(userId ? await buildPlanTagWhereForUser(userId) : {}),
+  };
   
   // Filter by status
   if (status && status !== 'all') {
@@ -179,9 +192,11 @@ export const getAllStocks = async (filters = {}) => {
 /**
  * Get active stock recommendations (entry, hold, exit status)
  */
-export const getActiveStocks = async () => {
+export const getActiveStocks = async ({ userId } = {}) => {
+  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
   const stocks = await prisma.stockRecommendation.findMany({
     where: {
+      ...planWhere,
       status: {
         in: ['entry', 'hold', 'exit'],
       },
@@ -198,9 +213,10 @@ export const getActiveStocks = async () => {
 /**
  * Get stock recommendation by ID
  */
-export const getStockById = async (id) => {
-  const stock = await prisma.stockRecommendation.findUnique({
-    where: { id },
+export const getStockById = async (id, { userId } = {}) => {
+  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
+  const stock = await prisma.stockRecommendation.findFirst({
+    where: { id, ...planWhere },
   });
   
   if (!stock) {
@@ -292,9 +308,10 @@ export const getPerformanceStats = async () => {
 /**
  * Get stocks by status
  */
-export const getStocksByStatus = async (status) => {
+export const getStocksByStatus = async (status, { userId } = {}) => {
+  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
   const stocks = await prisma.stockRecommendation.findMany({
-    where: { status: status.toLowerCase() },
+    where: { ...planWhere, status: status.toLowerCase() },
     orderBy: { dateOfRec: 'desc' },
   });
   

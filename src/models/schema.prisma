@@ -75,6 +75,11 @@ enum StockStatus {
   exited
 }
 
+enum StockPlanTag {
+  basic
+  advanced
+}
+
 model StockRecommendation {
   id           String      @id @default(cuid())
   createdAt    DateTime    @default(now())
@@ -89,6 +94,7 @@ model StockRecommendation {
   potentialPct Float
   realisedPct  Float?
   status       StockStatus
+  planTag      StockPlanTag @default(basic)
   pdfUrl       String?     // Legacy: full URL (deprecated, use pdfKey)
   pdfKey       String?     // S3 key for PDF (e.g., stocks/{id}.pdf)
   currentPrice Float?      // Current market price from NSE
@@ -118,5 +124,10 @@ model PublicChatMessage {
   text      String
   isAdmin   Boolean  @default(false)
 
+  replyToId String?
+  replyTo   PublicChatMessage? @relation("PublicChatMessageReplies", fields: [replyToId], references: [id])
+  replies   PublicChatMessage[] @relation("PublicChatMessageReplies")
+
   @@index([createdAt])
+  @@index([replyToId])
 }

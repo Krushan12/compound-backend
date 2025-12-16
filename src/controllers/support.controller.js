@@ -8,6 +8,7 @@ export const getPublicChatMessagesValidators = [
 
 export const postPublicChatMessageValidators = [
   body('text').isString().trim().isLength({ min: 1, max: 1000 }).withMessage('Text is required'),
+  body('replyToId').optional({ nullable: true }).isString().trim().notEmpty().withMessage('replyToId must be a non-empty string'),
 ];
 
 export const getPublicChatMessages = async (req, res) => {
@@ -25,8 +26,13 @@ export const postPublicChatMessage = async (req, res) => {
   const mobile = req.user.mobile;
   await SupportService.assertAdvancedAccess(userId);
 
-  const { text } = req.body;
-  const message = await SupportService.createPublicChatMessage(userId, mobile, text ? String(text).trim() : '');
+  const { text, replyToId } = req.body;
+  const message = await SupportService.createPublicChatMessage(
+    userId,
+    mobile,
+    text ? String(text).trim() : '',
+    replyToId ? String(replyToId).trim() : null,
+  );
 
   return success(res, { message }, 'Message posted');
 };
