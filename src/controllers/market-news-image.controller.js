@@ -31,7 +31,12 @@ export const getMarketNewsImage = (s3Client) => async (req, res) => {
     return res.status(400).json({ success: false, message: 'key or url is required' });
   }
 
-  const bucket = process.env.S3_BUCKET;
+  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+  if (!region) {
+    return res.status(500).json({ success: false, message: 'AWS_REGION is not configured' });
+  }
+
+  const bucket = process.env.MARKET_NEWS_S3_BUCKET || process.env.S3_BUCKET;
   if (!bucket) {
     return res.status(500).json({ success: false, message: 'S3_BUCKET is not configured' });
   }
@@ -56,8 +61,34 @@ export const getMarketNewsImage = (s3Client) => async (req, res) => {
 
     obj.Body.pipe(res);
   } catch (e) {
-    logger.error('market-news.image.proxy.error', { key, error: e?.message || String(e) });
-    return res.status(404).json({ success: false, message: 'Image not found' });
+    const name = e?.name;
+    const httpStatusCode = e?.$metadata?.httpStatusCode;
+    const message = e?.message || String(e);
+
+    logger.error('market-news.image.proxy.error', {
+      key,
+      bucket,
+      name,
+      httpStatusCode,
+      error: message,
+    });
+
+    if (name === 'NoSuchKey' || httpStatusCode === 404) {
+      return res.status(404).json({ success: false, message: 'Image not found' });
+    }
+
+    if (name === 'AccessDenied' || httpStatusCode === 403) {
+      return res.status(403).json({ success: false, message: 'S3 access denied' });
+    }
+
+    if (
+      name === 'CredentialsProviderError' ||
+      /Missing credentials|Could not load credentials|credentials/i.test(message)
+    ) {
+      return res.status(500).json({ success: false, message: 'S3 credentials are not available' });
+    }
+
+    return res.status(502).json({ success: false, message: 'Failed to fetch image from S3' });
   }
 };
 
