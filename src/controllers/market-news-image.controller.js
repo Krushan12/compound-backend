@@ -7,6 +7,23 @@ export const getMarketNewsImageValidators = [
   query('url').optional().isString(),
 ];
 
+function normalizeKey(rawKey) {
+  if (!rawKey || typeof rawKey !== 'string') return rawKey;
+
+  let key = rawKey;
+  for (let i = 0; i < 2; i++) {
+    if (!/%[0-9A-Fa-f]{2}/.test(key)) break;
+    try {
+      const decoded = decodeURIComponent(key);
+      if (decoded === key) break;
+      key = decoded;
+    } catch (_e) {
+      break;
+    }
+  }
+  return key;
+}
+
 function extractKeyFromUrl(url) {
   const parsed = new URL(url);
   const key = parsed.pathname.startsWith('/') ? parsed.pathname.slice(1) : parsed.pathname;
@@ -30,6 +47,8 @@ export const getMarketNewsImage = (s3Client) => async (req, res) => {
   if (!key) {
     return res.status(400).json({ success: false, message: 'key or url is required' });
   }
+
+  key = normalizeKey(key);
 
   const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
   if (!region) {
