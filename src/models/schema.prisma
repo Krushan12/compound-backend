@@ -104,6 +104,22 @@ model StockRecommendation {
   @@index([status, dateOfRec])
 }
 
+model MarketNews {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  title       String
+  source      String
+  publishedAt DateTime
+  imageUrl    String
+  category    String
+  content     String
+  author      String?
+  url         String?
+
+  @@index([publishedAt])
+}
+
 model MobileOtp {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())

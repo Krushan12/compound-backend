@@ -15,6 +15,15 @@ export const createOrUpdateSubscription = async (userId, { plan, amount, tier = 
     case 'quarterly':
       expiresAt = new Date(now.setMonth(now.getMonth() + 3));
       break;
+    case 'threeMonths':
+      expiresAt = new Date(now.setMonth(now.getMonth() + 3));
+      break;
+    case 'sixMonths':
+      expiresAt = new Date(now.setMonth(now.getMonth() + 6));
+      break;
+    case 'nineMonths':
+      expiresAt = new Date(now.setMonth(now.getMonth() + 9));
+      break;
     case 'yearly':
       expiresAt = new Date(now.setFullYear(now.getFullYear() + 1));
       break;

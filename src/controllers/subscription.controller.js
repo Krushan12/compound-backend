@@ -3,7 +3,9 @@ import { success } from '../utils/response.js';
 import * as SubscriptionService from '../services/subscription.service.js';
 
 export const createSubscriptionValidators = [
-  body('plan').isIn(['monthly', 'quarterly', 'yearly']).withMessage('Invalid plan'),
+  body('plan')
+      .isIn(['monthly', 'quarterly', 'yearly', 'threeMonths', 'sixMonths', 'nineMonths'])
+      .withMessage('Invalid plan'),
   body('amount').isFloat({ min: 0 }).withMessage('Invalid amount'),
   body('tier').optional().isIn(['basic', 'advanced']).withMessage('Invalid tier'),
 ];
