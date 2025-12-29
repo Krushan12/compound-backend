@@ -95,8 +95,17 @@ export const handlePaymentSuccess = async (payload) => {
   const expiry = dayjs().add(30, 'day').toDate();
   await prisma.subscription.upsert({
     where: { userId },
-    update: { status: 'ACTIVE', expiresAt: expiry },
-    create: { userId, status: 'ACTIVE', expiresAt: expiry },
+    update: {
+      status: 'ACTIVE',
+      expiresAt: expiry,
+      startedAt: new Date(),
+    },
+    create: {
+      userId,
+      status: 'ACTIVE',
+      expiresAt: expiry,
+      startedAt: new Date(),
+    },
   });
 };
 
@@ -143,6 +152,7 @@ export const verifyOrderPayment = async (userId, { orderId, paymentId, signature
       tier,
       amount: Number(amount),
       plan: plan || undefined,
+      startedAt: new Date(),
     },
     create: {
       userId,
