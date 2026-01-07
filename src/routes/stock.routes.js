@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validate } from '../middlewares/validate.middleware.js';
-import auth from '../middlewares/auth.middleware.js';
+import auth, { optionalAuth } from '../middlewares/auth.middleware.js';
 import {
   getAllStocks,
   getAllStocksValidators,
@@ -64,7 +64,7 @@ router.get('/', auth, getAllStocksValidators, validate, getAllStocks);
  *       200:
  *         description: Active stocks fetched successfully
  */
-router.get('/active', auth, getActiveStocks);
+router.get('/active', optionalAuth, getActiveStocks);
 
 /**
  * @swagger
@@ -78,7 +78,7 @@ router.get('/active', auth, getActiveStocks);
  *       200:
  *         description: Performance stats fetched successfully
  */
-router.get('/performance', auth, getPerformanceStats);
+router.get('/performance', optionalAuth, getPerformanceStats);
 
 /**
  * @swagger
@@ -99,7 +99,7 @@ router.get('/performance', auth, getPerformanceStats);
  *       200:
  *         description: Stocks fetched successfully
  */
-router.get('/status/:status', auth, getStocksByStatusValidators, validate, getStocksByStatus);
+router.get('/status/:status', optionalAuth, getStocksByStatusValidators, validate, getStocksByStatus);
 
 /**
  * @swagger

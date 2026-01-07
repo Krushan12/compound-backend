@@ -4,11 +4,18 @@ import * as SubscriptionService from './subscription.service.js';
 const prisma = new PrismaClient();
 
 async function buildPlanTagWhereForUser(userId) {
+  // Guests or unknown users: show only basic-plan recommendations
+  if (!userId) {
+    return { planTag: 'basic' };
+  }
+
   const subscription = await SubscriptionService.getUserSubscription(userId);
   const tier = (subscription?.tier || 'basic').toLowerCase();
   if (subscription && subscription.status === 'ACTIVE' && tier === 'advanced') {
+    // Advanced subscribers see both basic and advanced recommendations
     return {};
   }
+
   // Default: basic visibility
   return { planTag: 'basic' };
 }
@@ -147,7 +154,7 @@ export const getAllStocks = async (filters = {}) => {
   const { userId, status, search, page = 1, limit = 10 } = filters;
   
   const where = {
-    ...(userId ? await buildPlanTagWhereForUser(userId) : {}),
+    ...(await buildPlanTagWhereForUser(userId)),
   };
   
   // Filter by status
@@ -193,7 +200,7 @@ export const getAllStocks = async (filters = {}) => {
  * Get active stock recommendations (entry, hold, exit status)
  */
 export const getActiveStocks = async ({ userId } = {}) => {
-  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
+  const planWhere = await buildPlanTagWhereForUser(userId);
   const stocks = await prisma.stockRecommendation.findMany({
     where: {
       ...planWhere,
@@ -214,7 +221,7 @@ export const getActiveStocks = async ({ userId } = {}) => {
  * Get stock recommendation by ID
  */
 export const getStockById = async (id, { userId } = {}) => {
-  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
+  const planWhere = await buildPlanTagWhereForUser(userId);
   const stock = await prisma.stockRecommendation.findFirst({
     where: { id, ...planWhere },
   });
@@ -309,7 +316,7 @@ export const getPerformanceStats = async () => {
  * Get stocks by status
  */
 export const getStocksByStatus = async (status, { userId } = {}) => {
-  const planWhere = userId ? await buildPlanTagWhereForUser(userId) : {};
+  const planWhere = await buildPlanTagWhereForUser(userId);
   const stocks = await prisma.stockRecommendation.findMany({
     where: { ...planWhere, status: status.toLowerCase() },
     orderBy: { dateOfRec: 'desc' },
