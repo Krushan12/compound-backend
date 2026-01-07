@@ -6,6 +6,10 @@ import prisma from '../config/db.js';
 const DEMO_MOBILE = '9999999999';
 const DEMO_OTP = '123456';
 
+// Expired-subscription demo account for App Store review
+const EXPIRED_DEMO_MOBILE = '8888888888';
+const EXPIRED_DEMO_OTP = '654321';
+
 // Generate a 6-digit OTP code
 const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
@@ -13,8 +17,8 @@ const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000)
 export const sendOtp = async (mobile) => {
   const normalizedMobile = String(mobile).replace(/\D/g, '').slice(-10);
 
-  if (normalizedMobile === DEMO_MOBILE) {
-    const otpCode = DEMO_OTP;
+  if (normalizedMobile === DEMO_MOBILE || normalizedMobile === EXPIRED_DEMO_MOBILE) {
+    const otpCode = normalizedMobile === DEMO_MOBILE ? DEMO_OTP : EXPIRED_DEMO_OTP;
 
     await prisma.mobileOtp.upsert({
       where: { mobile: normalizedMobile },
@@ -139,16 +143,51 @@ export const emailSignin = async (userId, email) => {
 };
 
 export const signInWithMobile = async (mobile) => {
-  let user = await prisma.user.findUnique({ 
+  let user = await prisma.user.findUnique({
     where: { mobile },
-    include: { subscription: true }
+    include: { subscription: true },
   });
+
   if (!user) {
-    user = await prisma.user.create({ 
+    user = await prisma.user.create({
       data: { mobile, kycStatus: 'NOT_STARTED' },
-      include: { subscription: true }
+      include: { subscription: true },
     });
   }
+
+  // For the expired-demo test account, ensure there is an EXPIRED subscription
+  if (mobile === EXPIRED_DEMO_MOBILE) {
+    const now = new Date();
+    const startedAt = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    const expiresAt = new Date(now.getTime() - 24 * 60 * 60 * 1000); // yesterday
+
+    let subscription = await prisma.subscription.findUnique({ where: { userId: user.id } });
+
+    if (!subscription) {
+      subscription = await prisma.subscription.create({
+        data: {
+          userId: user.id,
+          status: 'EXPIRED',
+          plan: 'monthly',
+          amount: 0,
+          tier: 'advanced',
+          startedAt,
+          expiresAt,
+        },
+      });
+    } else if (subscription.status !== 'EXPIRED') {
+      subscription = await prisma.subscription.update({
+        where: { userId: user.id },
+        data: {
+          status: 'EXPIRED',
+          expiresAt: subscription.expiresAt && subscription.expiresAt < now ? subscription.expiresAt : expiresAt,
+        },
+      });
+    }
+
+    user = { ...user, subscription };
+  }
+
   const token = jwt.sign({ id: user.id, mobile: user.mobile }, env.JWT_SECRET, { expiresIn: '7d' });
   return { user, token };
 };
