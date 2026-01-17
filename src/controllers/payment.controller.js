@@ -2,14 +2,21 @@ import { body } from 'express-validator';
 import { success } from '../utils/response.js';
 import * as PaymentService from '../services/payment.service.js';
 
-export const createOrderValidators = [body('amount').isInt({ gt: 0 })];
+export const createOrderValidators = [
+  body('amount').isFloat({ gt: 0 }),
+  body('couponCode').optional().isString(),
+  body('plan')
+    .optional()
+    .isIn(['trialOneMonth', 'monthly', 'quarterly', 'yearly', 'threeMonths', 'sixMonths', 'nineMonths']),
+  body('tier').optional().isIn(['basic', 'advanced']),
+];
 
 export const createOrder = async (req, res) => {
   try {
-    const { amount, couponCode } = req.body;
+    const { amount, couponCode, plan, tier } = req.body;
     const finalAmount = couponCode === 'RAINBOWMONEY' ? 10 : amount;
-    console.log('🎯 Creating order for user:', req.user.id, { amount: finalAmount, couponCode });
-    const out = await PaymentService.createOrder(req.user.id, Number(finalAmount));
+    console.log('🎯 Creating order for user:', req.user.id, { amount: finalAmount, couponCode, plan, tier });
+    const out = await PaymentService.createOrder(req.user.id, Number(finalAmount), { plan, tier, couponCode });
     return success(res, out, 'Order created');
   } catch (error) {
     console.error('❌ Order creation failed:', error);

@@ -5,18 +5,49 @@ import env from '../config/env.js';
 import crypto from 'crypto';
 import * as SubscriptionService from './subscription.service.js';
 
-export const createOrder = async (userId, amount) => {
+ const getRazorpayInstance = () =>
+  new Razorpay({ key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET });
+
+ const inferPlanAndTierFromAmountPaise = (paise) => {
+  if (paise === 499900) return null;
+  const map = {
+    4900: { plan: 'trialOneMonth', tier: 'basic' },
+    9900: { plan: 'trialOneMonth', tier: 'advanced' },
+    149900: { plan: 'threeMonths', tier: 'basic' },
+    249900: { plan: 'threeMonths', tier: 'advanced' },
+    299900: { plan: 'sixMonths', tier: 'basic' },
+    499900: { plan: 'sixMonths', tier: 'advanced' },
+    399900: { plan: 'nineMonths', tier: 'basic' },
+    649900: { plan: 'nineMonths', tier: 'advanced' },
+    899900: { plan: 'yearly', tier: 'advanced' },
+    1000: { plan: 'monthly', tier: 'basic' },
+  };
+
+  return map[paise] || null;
+ };
+
+export const createOrder = async (userId, amount, { plan = null, tier = null, couponCode = null } = {}) => {
   try {
     console.log('🔑 Testing Razorpay Keys for Order:', { 
       keyId: env.RAZORPAY_KEY_ID ? `${env.RAZORPAY_KEY_ID.substring(0, 8)}...` : 'MISSING',
       keySecret: env.RAZORPAY_KEY_SECRET ? `${env.RAZORPAY_KEY_SECRET.substring(0, 8)}...` : 'MISSING'
     });
     
-    const instance = new Razorpay({ key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET });
+    const instance = getRazorpayInstance();
     const paise = Math.round(Number(amount) * 100);
     
     console.log('📋 Creating Razorpay order:', { userId, amount, paise });
-    const order = await instance.orders.create({ amount: paise, currency: 'INR', receipt: `rcpt_${Date.now()}` });
+    const order = await instance.orders.create({
+      amount: paise,
+      currency: 'INR',
+      receipt: `rcpt_${Date.now()}`,
+      notes: {
+        userId,
+        ...(plan ? { plan } : {}),
+        ...(tier ? { tier } : {}),
+        ...(couponCode ? { couponCode } : {}),
+      },
+    });
     console.log('✅ Order created successfully:', order.id);
 
     await prisma.transaction.create({
@@ -39,7 +70,42 @@ export const createOrder = async (userId, amount) => {
 export const handleRazorpayWebhook = async (payload) => {
   const event = payload?.event;
   try {
-    if (event === 'invoice.paid') {
+    if (event === 'payment.captured') {
+      const payment = payload?.payload?.payment?.entity;
+      const orderId = payment?.order_id;
+      if (!orderId) return;
+
+      const tx = await prisma.transaction.findFirst({ where: { providerOrderId: orderId } });
+      if (!tx) return;
+
+      if (tx.status !== 'SUCCESS') {
+        await prisma.transaction.update({ where: { id: tx.id }, data: { status: 'SUCCESS' } });
+      }
+
+      let plan = null;
+      let tier = null;
+
+      try {
+        const instance = getRazorpayInstance();
+        const order = await instance.orders.fetch(orderId);
+        plan = order?.notes?.plan || null;
+        tier = order?.notes?.tier || null;
+      } catch (e) {
+        // best-effort; fallback to amount inference
+      }
+
+      if (!plan || !tier) {
+        const inferred = inferPlanAndTierFromAmountPaise(tx.amount);
+        plan = plan || inferred?.plan || 'monthly';
+        tier = tier || inferred?.tier || 'basic';
+      }
+
+      await SubscriptionService.createOrUpdateSubscription(tx.userId, {
+        plan,
+        amount: tx.amount / 100,
+        tier,
+      });
+    } else if (event === 'invoice.paid') {
       const invoice = payload?.payload?.invoice?.entity;
       const subscriptionId = invoice?.subscription_id;
       if (!subscriptionId) return;
@@ -82,7 +148,8 @@ export const handleRazorpayWebhook = async (payload) => {
       }
     }
   } catch (e) {
-    // swallow to avoid webhook retries flood; rely on logs in real system
+    console.error('❌ Razorpay webhook handler failed:', { event, message: e?.message, stack: e?.stack });
+    throw e;
   }
 };
 
@@ -176,7 +243,7 @@ export const createSubscription = async (userId, { plan, amount, customer, tier 
       keySecret: env.RAZORPAY_KEY_SECRET ? `${env.RAZORPAY_KEY_SECRET.substring(0, 8)}...` : 'MISSING'
     });
     
-    const instance = new Razorpay({ key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET });
+    const instance = getRazorpayInstance();
     const paise = Math.round(Number(amount) * 100);
 
     console.log('📋 Creating subscription:', { userId, plan, amount, paise });
