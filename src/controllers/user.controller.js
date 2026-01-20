@@ -14,4 +14,9 @@ export const update = async (req, res) => {
   return success(res, out, 'Profile updated');
 };
 
-export default { profile, update };
+export const deleteAccount = async (req, res) => {
+  const out = await UserService.deleteAccount(req.user.id);
+  return success(res, out, 'Account deleted');
+};
+
+export default { profile, update, deleteAccount };

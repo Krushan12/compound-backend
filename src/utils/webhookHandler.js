@@ -13,7 +13,8 @@ export const handleWebhook = async (req, res, handler, secretEnvKey) => {
     const signature = req.headers['x-webhook-signature'] || req.headers['x-razorpay-signature'];
     const secret = env[secretEnvKey] || '';
 
-    if (secret && signature) {
+    if (secret) {
+      if (!signature) return res.status(401).json({ success: false, message: 'Missing signature' });
       const ok = verifySignature(rawBody, signature, secret);
       if (!ok) return res.status(401).json({ success: false, message: 'Invalid signature' });
     }
