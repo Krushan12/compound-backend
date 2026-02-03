@@ -8,6 +8,10 @@ import {
   verifyOtpValidators,
   emailSignin,
   emailSigninValidators,
+  refreshSession,
+  refreshSessionValidators,
+  logout,
+  logoutValidators,
 } from '../controllers/auth.controller.js';
 
 const router = Router();
@@ -15,5 +19,7 @@ const router = Router();
 router.post('/send-otp', sendOtpValidators, validate, sendOtp);
 router.post('/verify-otp', verifyOtpValidators, validate, verifyOtp);
 router.post('/email-signin', auth, emailSigninValidators, validate, emailSignin);
+router.post('/refresh', refreshSessionValidators, validate, refreshSession);
+router.post('/logout', logoutValidators, validate, logout);
 
 export default router;

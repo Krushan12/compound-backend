@@ -25,18 +25,26 @@ export const isAdminUser = (mobile) => {
   return adminMobiles.includes(normalized);
 };
 
-export const assertAdvancedAccess = async (userId) => {
+export const assertChatAccess = async (userId, mobile) => {
+  if (isAdminUser(mobile)) {
+    return;
+  }
   const subscription = await SubscriptionService.getUserSubscription(userId);
-  if (!subscription || subscription.status !== 'ACTIVE' || subscription.tier !== 'advanced') {
-    const err = new Error('Priority chat is available only for Advanced subscribers');
+  const status = String(subscription?.status || '').toUpperCase();
+  const tier = String(subscription?.tier || '').toLowerCase();
+  const hasAllowedTier = tier === 'basic' || tier === 'advanced';
+  if (!subscription || status !== 'ACTIVE' || !hasAllowedTier) {
+    const err = new Error('1-on-1 chat is available for active Basic or Advanced subscribers');
     err.status = 403;
     throw err;
   }
 };
 
-export const listPublicChatMessages = async ({ limit = 50 } = {}) => {
+export const listPublicChatMessages = async ({ limit = 50, userId } = {}) => {
   const safeLimit = Math.min(Math.max(limit, 1), 200);
+  const where = userId ? { userId } : undefined;
   const messages = await prisma.publicChatMessage.findMany({
+    where,
     orderBy: { createdAt: 'asc' },
     take: safeLimit,
     include: {
@@ -63,11 +71,37 @@ export const listPublicChatMessages = async ({ limit = 50 } = {}) => {
   return messages;
 };
 
-export const createPublicChatMessage = async (userId, mobile, text, replyToId = null) => {
+export const listChatThreads = async () => {
+  const threads = await prisma.publicChatMessage.findMany({
+    where: { userId: { not: null } },
+    orderBy: { createdAt: 'desc' },
+    distinct: ['userId'],
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+        },
+      },
+    },
+  });
+
+  return threads.map((message) => ({
+    userId: message.userId,
+    userName: message.user?.name ?? null,
+    userMobile: message.user?.mobile ?? null,
+    lastMessageText: message.text,
+    lastMessageAt: message.createdAt,
+    lastMessageIsAdmin: message.isAdmin,
+  }));
+};
+
+export const createPublicChatMessage = async (conversationUserId, mobile, text, replyToId = null) => {
   const isAdmin = isAdminUser(mobile);
   const message = await prisma.publicChatMessage.create({
     data: {
-      userId,
+      userId: conversationUserId,
       text,
       isAdmin,
       replyToId: replyToId || null,
@@ -84,4 +118,11 @@ export const deletePublicChatMessage = async (id) => {
   return deleted;
 };
 
-export default { isAdminUser, assertAdvancedAccess, listPublicChatMessages, createPublicChatMessage, deletePublicChatMessage };
+export default {
+  isAdminUser,
+  assertChatAccess,
+  listPublicChatMessages,
+  listChatThreads,
+  createPublicChatMessage,
+  deletePublicChatMessage,
+};

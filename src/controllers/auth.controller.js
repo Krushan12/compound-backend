@@ -9,6 +9,8 @@ export const verifyOtpValidators = [
   body('code').isString().isLength({ min: 4 }),
 ];
 export const emailSigninValidators = [body('email').isEmail()];
+export const refreshSessionValidators = [body('refreshToken').isString().isLength({ min: 16 })];
+export const logoutValidators = [body('refreshToken').optional().isString()];
 
 export const sendOtp = async (req, res) => {
   logger.info('auth.sendOtp.request', { ip: req.ip, mobile: req.body?.mobile ? String(req.body.mobile).slice(-4) : null });
@@ -35,4 +37,20 @@ export const emailSignin = async (req, res) => {
   return success(res, out, 'Email saved');
 };
 
-export default { sendOtp, verifyOtp, emailSignin };
+export const refreshSession = async (req, res) => {
+  logger.info('auth.refresh.request', { ip: req.ip, hasRefresh: !!req.body?.refreshToken });
+  const out = await AuthService.refreshSession(req.body.refreshToken);
+  if (!out) {
+    logger.warn('auth.refresh.invalid', { ip: req.ip });
+    return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+  }
+  logger.info('auth.refresh.success', { userId: out.user?.id });
+  return success(res, out, 'Session refreshed');
+};
+
+export const logout = async (req, res) => {
+  await AuthService.revokeRefreshToken(req.body?.refreshToken);
+  return success(res, {}, 'Logged out');
+};
+
+export default { sendOtp, verifyOtp, emailSignin, refreshSession, logout };

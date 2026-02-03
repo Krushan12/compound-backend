@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import crypto from 'crypto';
 import env from '../config/env.js';
 import prisma from '../config/db.js';
 
@@ -9,6 +10,72 @@ const DEMO_OTP = '123456';
 // Expired-subscription demo account for App Store review
 const EXPIRED_DEMO_MOBILE = '8888888888';
 const EXPIRED_DEMO_OTP = '654321';
+
+const refreshTokenTtlMs = env.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000;
+
+const createAccessToken = (user) =>
+  jwt.sign({ id: user.id, mobile: user.mobile }, env.JWT_SECRET, {
+    expiresIn: env.ACCESS_TOKEN_EXPIRES_IN,
+  });
+
+const hashRefreshToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const createRefreshToken = async (userId) => {
+  const refreshToken = crypto.randomBytes(64).toString('hex');
+  const tokenHash = hashRefreshToken(refreshToken);
+  const expiresAt = new Date(Date.now() + refreshTokenTtlMs);
+  await prisma.refreshToken.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+    },
+  });
+  return refreshToken;
+};
+
+export const issueTokensForUser = async (user) => {
+  const accessToken = createAccessToken(user);
+  const refreshToken = await createRefreshToken(user.id);
+  return {
+    accessToken,
+    refreshToken,
+    accessTokenExpiresIn: env.ACCESS_TOKEN_EXPIRES_IN,
+    token: accessToken,
+  };
+};
+
+export const refreshSession = async (refreshToken) => {
+  if (!refreshToken) return null;
+  const tokenHash = hashRefreshToken(String(refreshToken));
+  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    return null;
+  }
+
+  await prisma.refreshToken.update({
+    where: { id: stored.id },
+    data: { revokedAt: new Date() },
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: stored.userId },
+    include: { subscription: true },
+  });
+  if (!user) return null;
+
+  const tokens = await issueTokensForUser(user);
+  return { user, ...tokens };
+};
+
+export const revokeRefreshToken = async (refreshToken) => {
+  if (!refreshToken) return;
+  const tokenHash = hashRefreshToken(String(refreshToken));
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+};
 
 // Generate a 6-digit OTP code
 const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000));
@@ -133,8 +200,8 @@ export const verifyOtp = async (mobile, code) => {
   }
 
   // Reuse existing signInWithMobile logic
-  const { user, token } = await signInWithMobile(normalizedMobile);
-  return { user, token };
+  const authPayload = await signInWithMobile(normalizedMobile);
+  return authPayload;
 };
 
 export const emailSignin = async (userId, email) => {
@@ -188,9 +255,16 @@ export const signInWithMobile = async (mobile) => {
     user = { ...user, subscription };
   }
 
-  const token = jwt.sign({ id: user.id, mobile: user.mobile }, env.JWT_SECRET, { expiresIn: '7d' });
-  return { user, token };
+  const tokens = await issueTokensForUser(user);
+  return { user, ...tokens };
 };
 
-export default { sendOtp, verifyOtp, emailSignin };
+export default {
+  sendOtp,
+  verifyOtp,
+  emailSignin,
+  refreshSession,
+  revokeRefreshToken,
+  issueTokensForUser,
+};
 
